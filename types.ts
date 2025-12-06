@@ -2,7 +2,7 @@ export interface Product {
   id: string;
   name: string;
   price: number;
-  category: 'mouse' | 'keyboard' | 'headset' | 'monitor' | 'chair';
+  category: 'mouse' | 'keyboard' | 'headset' | 'monitor' | 'chair' | 'controller' | 'streaming';
   image: string;
   description: string;
   specs: string[];
@@ -32,6 +32,7 @@ export interface Order {
 export type ViewState = 
   | 'home' 
   | 'shop' 
+  | 'categories'
   | 'product-detail' 
   | 'cart' 
   | 'checkout' 

@@ -18,7 +18,8 @@ import {
   Star,
   Zap,
   ChevronRight,
-  ArrowLeft
+  ArrowLeft,
+  ShieldCheck
 } from 'lucide-react';
 
 export const Icons = {
@@ -41,5 +42,6 @@ export const Icons = {
   Star,
   Zap,
   ArrowRight: ChevronRight,
-  Back: ArrowLeft
+  Back: ArrowLeft,
+  ShieldCheck
 };
