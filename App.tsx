@@ -3,6 +3,13 @@ import { Icons } from './components/Icons';
 import { Product, CartItem, User, Order, ViewState, ChatMessage } from './types';
 import * as db from './services/mockDb';
 import * as gemini from './services/geminiService';
+import * as paymentService from './services/paymentService';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
+
+// --- Stripe Initialization ---
+// Public Key is safe for client-side use.
+const stripePromise = loadStripe('pk_test_51Sbo8ELhEcchiBDBuSFdGjSvLN3A2sV5VTyyrqMEAqTS4jOjBPA5noka7a6GmnRjf7isDYwihLuNLcdURpz4nmcn00SKGWNj5j');
 
 // --- Contexts ---
 
@@ -35,21 +42,22 @@ const useAppContext = () => {
 
 const Button: React.FC<{
   children: React.ReactNode;
-  onClick?: () => void;
+  onClick?: (e?: any) => void;
   variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
   className?: string;
   disabled?: boolean;
-}> = ({ children, onClick, variant = 'primary', className = '', disabled }) => {
+  type?: "button" | "submit" | "reset";
+}> = ({ children, onClick, variant = 'primary', className = '', disabled, type = "button" }) => {
   const baseStyle = "px-6 py-2 rounded-lg font-display font-bold transition-all duration-200 flex items-center justify-center gap-2 active:scale-95 hover:shadow-lg hover:-translate-y-0.5";
   const variants = {
-    primary: "bg-neon-cyan/90 text-black hover:bg-neon-cyan hover:shadow-[0_0_15px_rgba(0,255,255,0.5)] disabled:opacity-50 disabled:hover:translate-y-0 disabled:active:scale-100",
-    secondary: "bg-surface border border-neon-purple/50 text-neon-purple hover:bg-neon-purple/10 hover:border-neon-purple",
-    danger: "bg-red-500/20 text-red-400 border border-red-500/50 hover:bg-red-500/40",
-    ghost: "text-gray-400 hover:text-white hover:bg-white/5"
+    primary: "bg-neon-cyan/90 text-black hover:bg-neon-cyan hover:shadow-[0_0_15px_rgba(0,255,255,0.5)] disabled:opacity-50 disabled:hover:translate-y-0 disabled:active:scale-100 disabled:cursor-not-allowed",
+    secondary: "bg-surface border border-neon-purple/50 text-neon-purple hover:bg-neon-purple/10 hover:border-neon-purple disabled:opacity-50",
+    danger: "bg-red-500/20 text-red-400 border border-red-500/50 hover:bg-red-500/40 disabled:opacity-50",
+    ghost: "text-gray-400 hover:text-white hover:bg-white/5 disabled:opacity-50"
   };
 
   return (
-    <button onClick={onClick} className={`${baseStyle} ${variants[variant]} ${className}`} disabled={disabled}>
+    <button type={type} onClick={onClick} className={`${baseStyle} ${variants[variant]} ${className}`} disabled={disabled}>
       {children}
     </button>
   );
@@ -588,69 +596,138 @@ const CartView = () => {
   );
 };
 
-const CheckoutView = () => {
+const CheckoutForm = () => {
+  const stripe = useStripe();
+  const elements = useElements();
   const { cart, clearCart, setView, user } = useAppContext();
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const total = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
 
-  const handleCheckout = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!stripe || !elements) {
+      // Stripe.js has not loaded yet. Make sure to disable form submission until Stripe.js has loaded.
+      return;
+    }
+
     setLoading(true);
-    
-    // Simulate API Call
-    setTimeout(() => {
-      const order: Order = {
-        id: Math.random().toString(36).substr(2, 9),
-        userId: user ? user.id : 'guest',
-        items: [...cart],
-        total: total,
-        status: 'pending',
-        date: new Date().toISOString()
-      };
-      db.createOrder(order);
-      clearCart();
+    setError(null);
+
+    const cardElement = elements.getElement(CardElement);
+    if (!cardElement) {
       setLoading(false);
-      alert('Order placed successfully! Welcome to the elite.');
-      setView('home');
-    }, 2000);
+      return;
+    }
+
+    // 1. Create a Token/PaymentMethod on the client
+    const { error: stripeError, paymentMethod } = await stripe.createPaymentMethod({
+      type: 'card',
+      card: cardElement,
+      billing_details: {
+        email: user?.email || 'guest@example.com',
+      },
+    });
+
+    if (stripeError) {
+      setError(stripeError.message || 'Payment failed');
+      setLoading(false);
+    } else {
+      // 2. Send the PaymentMethod ID to the backend
+      const result = await paymentService.processPayment(paymentMethod.id, total);
+      
+      if (result.success) {
+        // Success
+        const order: Order = {
+          id: result.transactionId || Math.random().toString(36).substr(2, 9),
+          userId: user ? user.id : 'guest',
+          items: [...cart],
+          total: total,
+          status: 'pending',
+          date: new Date().toISOString()
+        };
+        db.createOrder(order);
+        clearCart();
+        alert('Payment Authorized! Order confirmed.');
+        setView('home');
+      } else {
+        setError(result.error || 'Server rejected payment');
+      }
+      setLoading(false);
+    }
+  };
+
+  const cardStyle = {
+    style: {
+      base: {
+        color: "#ffffff",
+        fontFamily: '"Outfit", sans-serif',
+        fontSmoothing: "antialiased",
+        fontSize: "16px",
+        "::placeholder": {
+          color: "#6b7280"
+        },
+        iconColor: "#00ffff"
+      },
+      invalid: {
+        color: "#ef4444",
+        iconColor: "#ef4444"
+      }
+    }
   };
 
   return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="bg-surface border border-white/10 p-6 rounded-xl space-y-4">
+        <h3 className="font-bold text-lg text-neon-cyan mb-4 flex items-center gap-2">
+          <Icons.User size={18} /> Shipping Details
+        </h3>
+        <div className="grid grid-cols-2 gap-4">
+          <input required type="text" placeholder="First Name" className="bg-black/50 border border-white/10 rounded-lg p-3 text-white focus:border-neon-cyan outline-none" />
+          <input required type="text" placeholder="Last Name" className="bg-black/50 border border-white/10 rounded-lg p-3 text-white focus:border-neon-cyan outline-none" />
+        </div>
+        <input required type="email" placeholder="Email" defaultValue={user?.email} className="w-full bg-black/50 border border-white/10 rounded-lg p-3 text-white focus:border-neon-cyan outline-none" />
+        <input required type="text" placeholder="Address" className="w-full bg-black/50 border border-white/10 rounded-lg p-3 text-white focus:border-neon-cyan outline-none" />
+        <div className="grid grid-cols-3 gap-4">
+          <input required type="text" placeholder="City" className="col-span-2 bg-black/50 border border-white/10 rounded-lg p-3 text-white focus:border-neon-cyan outline-none" />
+          <input required type="text" placeholder="ZIP" className="bg-black/50 border border-white/10 rounded-lg p-3 text-white focus:border-neon-cyan outline-none" />
+        </div>
+      </div>
+
+      <div className="bg-surface border border-white/10 p-6 rounded-xl space-y-4">
+        <h3 className="font-bold text-lg text-neon-purple mb-4 flex items-center gap-2">
+          <Icons.Card size={18} /> Secure Payment (Stripe)
+        </h3>
+        <div className="bg-black/50 border border-white/10 rounded-lg p-4">
+          <CardElement options={cardStyle} />
+        </div>
+        {error && <div className="text-red-400 text-sm mt-2">{error}</div>}
+      </div>
+
+      <Button type="submit" disabled={!stripe || loading} className="w-full py-4 text-lg">
+        {loading ? (
+          <span className="flex items-center gap-2">
+            <span className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></span>
+            Processing...
+          </span>
+        ) : `Pay $${total.toFixed(2)}`}
+      </Button>
+      
+      <p className="text-center text-xs text-gray-500 flex items-center justify-center gap-1">
+        <Icons.ShieldCheck size={12} /> Encrypted & Secured by Stripe
+      </p>
+    </form>
+  );
+};
+
+const CheckoutView = () => {
+  return (
     <div className="max-w-2xl mx-auto px-6 py-10 min-h-screen">
       <h2 className="text-3xl font-display font-bold mb-8">Secure Checkout</h2>
-      
-      <form onSubmit={handleCheckout} className="space-y-6">
-        <div className="bg-surface border border-white/10 p-6 rounded-xl space-y-4">
-          <h3 className="font-bold text-lg text-neon-cyan mb-4 flex items-center gap-2">
-            <Icons.User size={18} /> Shipping Details
-          </h3>
-          <div className="grid grid-cols-2 gap-4">
-            <input required type="text" placeholder="First Name" className="bg-black/50 border border-white/10 rounded-lg p-3 text-white focus:border-neon-cyan outline-none" />
-            <input required type="text" placeholder="Last Name" className="bg-black/50 border border-white/10 rounded-lg p-3 text-white focus:border-neon-cyan outline-none" />
-          </div>
-          <input required type="email" placeholder="Email" defaultValue={user?.email} className="w-full bg-black/50 border border-white/10 rounded-lg p-3 text-white focus:border-neon-cyan outline-none" />
-          <input required type="text" placeholder="Address" className="w-full bg-black/50 border border-white/10 rounded-lg p-3 text-white focus:border-neon-cyan outline-none" />
-          <div className="grid grid-cols-3 gap-4">
-            <input required type="text" placeholder="City" className="col-span-2 bg-black/50 border border-white/10 rounded-lg p-3 text-white focus:border-neon-cyan outline-none" />
-            <input required type="text" placeholder="ZIP" className="bg-black/50 border border-white/10 rounded-lg p-3 text-white focus:border-neon-cyan outline-none" />
-          </div>
-        </div>
-
-        <div className="bg-surface border border-white/10 p-6 rounded-xl space-y-4">
-          <h3 className="font-bold text-lg text-neon-purple mb-4 flex items-center gap-2">
-            <Icons.Card size={18} /> Payment
-          </h3>
-          <input required type="text" placeholder="Card Number" className="w-full bg-black/50 border border-white/10 rounded-lg p-3 text-white focus:border-neon-purple outline-none" />
-          <div className="grid grid-cols-2 gap-4">
-             <input required type="text" placeholder="MM/YY" className="bg-black/50 border border-white/10 rounded-lg p-3 text-white focus:border-neon-purple outline-none" />
-             <input required type="text" placeholder="CVC" className="bg-black/50 border border-white/10 rounded-lg p-3 text-white focus:border-neon-purple outline-none" />
-          </div>
-        </div>
-
-        <Button disabled={loading} className="w-full py-4 text-lg">
-          {loading ? 'Processing Transaction...' : `Pay $${total.toFixed(2)}`}
-        </Button>
-      </form>
+      <Elements stripe={stripePromise}>
+        <CheckoutForm />
+      </Elements>
     </div>
   );
 };
@@ -691,7 +768,7 @@ const LoginView = () => {
           <div className="text-xs text-gray-500">
             * Use 'admin@vortex.com' for Dashboard access.
           </div>
-          <Button className="w-full py-3">Initialize Session</Button>
+          <Button type="submit" className="w-full py-3">Initialize Session</Button>
         </form>
       </div>
     </div>
