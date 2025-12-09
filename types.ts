@@ -38,7 +38,11 @@ export type ViewState =
   | 'checkout' 
   | 'login' 
   | 'admin' 
-  | 'profile';
+  | 'profile'
+  | 'order-tracking'
+  | 'wishlist'
+  | 'terms'
+  | 'privacy';
 
 export interface ChatMessage {
   role: 'user' | 'model';

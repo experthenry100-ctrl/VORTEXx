@@ -19,7 +19,15 @@ import {
   Zap,
   ChevronRight,
   ArrowLeft,
-  ShieldCheck
+  ShieldCheck,
+  Package,
+  Truck,
+  MapPin,
+  CheckCircle,
+  Clock,
+  Heart,
+  Gift,
+  RotateCcw
 } from 'lucide-react';
 
 export const Icons = {
@@ -43,5 +51,13 @@ export const Icons = {
   Zap,
   ArrowRight: ChevronRight,
   Back: ArrowLeft,
-  ShieldCheck
+  ShieldCheck,
+  Package,
+  Truck,
+  MapPin,
+  CheckCircle,
+  Clock,
+  Heart,
+  Gift,
+  RotateCcw
 };

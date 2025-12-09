@@ -28,6 +28,9 @@ interface AppContextType {
   setSelectedProduct: (p: Product | null) => void;
   shopFilter: string;
   setShopFilter: (category: string) => void;
+  wishlist: Product[];
+  toggleWishlist: (product: Product) => void;
+  isInWishlist: (productId: string) => boolean;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -64,7 +67,8 @@ const Button: React.FC<{
 };
 
 const ProductCard: React.FC<{ product: Product }> = ({ product }) => {
-  const { addToCart, setView, setSelectedProduct } = useAppContext();
+  const { addToCart, setView, setSelectedProduct, toggleWishlist, isInWishlist } = useAppContext();
+  const isWishlisted = isInWishlist(product.id);
 
   const handleView = () => {
     setSelectedProduct(product);
@@ -79,9 +83,18 @@ const ProductCard: React.FC<{ product: Product }> = ({ product }) => {
           alt={product.name} 
           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 opacity-80 group-hover:opacity-100" 
         />
-        <div className="absolute top-2 right-2 bg-black/80 backdrop-blur text-neon-green text-xs px-2 py-1 rounded font-mono border border-neon-green/30">
-          In Stock
+        <div className="absolute top-2 right-2 flex flex-col gap-2">
+           <div className="bg-black/80 backdrop-blur text-neon-green text-xs px-2 py-1 rounded font-mono border border-neon-green/30 text-center">
+            In Stock
+          </div>
+          <button 
+            onClick={(e) => { e.stopPropagation(); toggleWishlist(product); }}
+            className={`p-1.5 rounded-full backdrop-blur border transition-colors ${isWishlisted ? 'bg-red-500/20 border-red-500 text-red-500' : 'bg-black/50 border-white/20 text-gray-400 hover:text-white'}`}
+          >
+            <Icons.Heart size={16} fill={isWishlisted ? "currentColor" : "none"} />
+          </button>
         </div>
+
         {product.rating >= 4.8 && (
           <div className="absolute top-2 left-2 bg-neon-purple/80 backdrop-blur text-white text-xs px-2 py-1 rounded font-mono border border-neon-purple/30">
             Top Rated
@@ -112,7 +125,7 @@ const ProductCard: React.FC<{ product: Product }> = ({ product }) => {
 };
 
 const Navbar = () => {
-  const { cart, user, setView, logout } = useAppContext();
+  const { cart, user, setView, logout, wishlist } = useAppContext();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   return (
@@ -131,6 +144,7 @@ const Navbar = () => {
               <button onClick={() => setView('home')} className="hover:text-neon-cyan px-3 py-2 rounded-md text-sm font-medium transition-colors hover:bg-white/5">Home</button>
               <button onClick={() => setView('categories')} className="hover:text-neon-cyan px-3 py-2 rounded-md text-sm font-medium transition-colors hover:bg-white/5">Categories</button>
               <button onClick={() => setView('shop')} className="hover:text-neon-cyan px-3 py-2 rounded-md text-sm font-medium transition-colors hover:bg-white/5">Shop</button>
+              <button onClick={() => setView('order-tracking')} className="hover:text-neon-cyan px-3 py-2 rounded-md text-sm font-medium transition-colors hover:bg-white/5">Track Order</button>
               {user?.role === 'admin' && (
                 <button onClick={() => setView('admin')} className="text-neon-purple hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors hover:bg-neon-purple/10">Admin</button>
               )}
@@ -139,6 +153,19 @@ const Navbar = () => {
 
           {/* Icons */}
           <div className="hidden md:flex items-center gap-4">
+            <button 
+              onClick={() => setView('wishlist')}
+              className="relative p-2 text-gray-400 hover:text-red-400 transition-all hover:scale-110"
+              title="Wishlist"
+            >
+              <Icons.Heart size={24} />
+              {wishlist.length > 0 && (
+                <span className="absolute top-0 right-0 inline-flex items-center justify-center w-4 h-4 text-[10px] font-bold leading-none text-white bg-red-500 rounded-full">
+                  {wishlist.length}
+                </span>
+              )}
+            </button>
+
             <button 
               onClick={() => setView('cart')}
               className="relative p-2 text-gray-400 hover:text-white transition-all hover:scale-110"
@@ -188,6 +215,8 @@ const Navbar = () => {
             <button onClick={() => { setView('home'); setIsMenuOpen(false); }} className="block w-full text-left px-3 py-2 rounded-md text-base font-medium hover:bg-gray-800">Home</button>
             <button onClick={() => { setView('categories'); setIsMenuOpen(false); }} className="block w-full text-left px-3 py-2 rounded-md text-base font-medium hover:bg-gray-800">Categories</button>
             <button onClick={() => { setView('shop'); setIsMenuOpen(false); }} className="block w-full text-left px-3 py-2 rounded-md text-base font-medium hover:bg-gray-800">Shop</button>
+            <button onClick={() => { setView('wishlist'); setIsMenuOpen(false); }} className="block w-full text-left px-3 py-2 rounded-md text-base font-medium hover:bg-gray-800">Wishlist ({wishlist.length})</button>
+            <button onClick={() => { setView('order-tracking'); setIsMenuOpen(false); }} className="block w-full text-left px-3 py-2 rounded-md text-base font-medium hover:bg-gray-800">Track Order</button>
             <button onClick={() => { setView('cart'); setIsMenuOpen(false); }} className="block w-full text-left px-3 py-2 rounded-md text-base font-medium hover:bg-gray-800">Cart ({cart.length})</button>
             {user && (
                <button onClick={() => { setView('profile'); setIsMenuOpen(false); }} className="block w-full text-left px-3 py-2 rounded-md text-base font-medium hover:bg-gray-800">My Profile</button>
@@ -337,6 +366,25 @@ const HomeView = () => {
         </div>
       </div>
 
+      {/* Christmas Promotion Banner */}
+      <div className="bg-gradient-to-r from-red-900/40 via-green-900/40 to-red-900/40 border-y border-red-500/20 py-8 relative overflow-hidden">
+        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/snow.png')] opacity-30 animate-pulse"></div>
+        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">
+           <div className="flex items-center gap-4">
+             <div className="p-3 bg-red-600 rounded-full shadow-[0_0_20px_rgba(255,0,0,0.5)]">
+               <Icons.Gift className="text-white w-8 h-8" />
+             </div>
+             <div>
+               <h2 className="text-2xl font-display font-bold text-white tracking-widest">CYBER <span className="text-red-500">HOLIDAY</span> OPS</h2>
+               <p className="text-gray-300">Seasonal discount protocols active. Secure your upgrade before the new year reset.</p>
+             </div>
+           </div>
+           <Button onClick={() => setView('shop')} className="bg-red-600 hover:bg-red-500 text-white border-none shadow-lg shadow-red-900/50">
+             ACCESS HOLIDAY DEALS <Icons.ArrowRight size={18} />
+           </Button>
+        </div>
+      </div>
+
       {/* Featured Products */}
       <div className="max-w-7xl mx-auto px-6 py-20">
         <div className="flex justify-between items-end mb-10">
@@ -468,61 +516,202 @@ const ShopView = () => {
   );
 };
 
-const ProductDetailView = () => {
-  const { selectedProduct, addToCart, setView } = useAppContext();
-
-  if (!selectedProduct) return <div className="p-20 text-center">No product selected</div>;
+const WishlistView = () => {
+  const { wishlist, setView } = useAppContext();
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-10 min-h-screen">
+      <h2 className="text-3xl font-display font-bold mb-8 flex items-center gap-3">
+        <Icons.Heart className="text-red-500" /> WISHLIST PROTOCOL
+      </h2>
+
+      {wishlist.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 bg-surface/30 rounded-2xl border border-white/5">
+          <div className="p-6 bg-surface rounded-full mb-6">
+             <Icons.Heart className="w-12 h-12 text-gray-700" />
+          </div>
+          <h3 className="text-xl font-bold text-white mb-2">Target List Empty</h3>
+          <p className="text-gray-500 text-center max-w-md mb-6">You haven't marked any gear for acquisition yet. Browse the armory to tag equipment.</p>
+          <Button onClick={() => setView('shop')}>Browse Gear</Button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-in slide-in-from-bottom-5">
+          {wishlist.map(p => (
+            <ProductCard key={p.id} product={p} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const ProductDetailView = () => {
+  const { selectedProduct, addToCart, setView, toggleWishlist, isInWishlist } = useAppContext();
+  const [activeTab, setActiveTab] = useState<'desc' | 'specs' | 'reviews'>('desc');
+
+  if (!selectedProduct) return <div className="p-20 text-center">No product selected</div>;
+  const isWishlisted = isInWishlist(selectedProduct.id);
+
+  // Mock reviews based on rating
+  const reviews = [
+    { user: 'Alex G.', rating: 5, date: '2 days ago', text: 'Absolutely insane performance. Verified purchase.' },
+    { user: 'Sam K.', rating: 4, date: '1 week ago', text: 'Great value for the price, but shipping took a while.' },
+    { user: 'Jordan M.', rating: 5, date: '3 weeks ago', text: 'Best upgrade I have made to my setup this year.' }
+  ];
+
+  return (
+    <div className="max-w-7xl mx-auto px-6 py-10 min-h-screen">
+      {/* Back Button */}
       <Button variant="ghost" onClick={() => setView('shop')} className="mb-6 pl-0">
         <Icons.Back size={18} /> Back to Shop
       </Button>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-12 animate-in slide-in-from-bottom-5 duration-500">
-        <div className="relative group">
-          <div className="absolute inset-0 bg-neon-cyan/20 blur-3xl rounded-full opacity-20 group-hover:opacity-40 transition-opacity"></div>
-          <img 
-            src={selectedProduct.image} 
-            alt={selectedProduct.name} 
-            className="relative w-full rounded-2xl border border-white/10 shadow-2xl z-10" 
-          />
+
+      {/* Main Info Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-16 animate-in slide-in-from-bottom-5 duration-500">
+        {/* Image */}
+        <div className="relative group h-fit">
+           <div className="absolute inset-0 bg-neon-cyan/20 blur-3xl rounded-full opacity-20 group-hover:opacity-40 transition-opacity"></div>
+           <img 
+             src={selectedProduct.image} 
+             alt={selectedProduct.name} 
+             className="relative w-full rounded-2xl border border-white/10 shadow-2xl z-10" 
+           />
         </div>
 
-        <div className="space-y-6">
-          <div>
-            <span className="text-neon-purple font-mono text-sm uppercase tracking-widest">{selectedProduct.category}</span>
-            <h1 className="text-4xl md:text-5xl font-display font-bold mt-2">{selectedProduct.name}</h1>
-            <div className="flex items-center gap-4 mt-4">
-              <span className="text-3xl font-bold text-neon-cyan">${selectedProduct.price}</span>
-              <div className="flex items-center text-yellow-400 bg-surface px-3 py-1 rounded-full border border-white/5">
-                <Icons.Star size={16} className="fill-current mr-2" />
-                <span className="text-white">{selectedProduct.rating.toFixed(1)} Rating</span>
+        {/* Right Column: Key Info & Actions */}
+        <div className="space-y-8">
+           {/* Header info */}
+           <div>
+             <span className="text-neon-purple font-mono text-sm uppercase tracking-widest">{selectedProduct.category}</span>
+             <h1 className="text-4xl md:text-5xl font-display font-bold mt-2">{selectedProduct.name}</h1>
+             <div className="flex items-center gap-4 mt-4">
+               <span className="text-3xl font-bold text-neon-cyan">${selectedProduct.price}</span>
+               <div className="flex items-center text-yellow-400 bg-surface px-3 py-1 rounded-full border border-white/5">
+                 <Icons.Star size={16} className="fill-current mr-2" />
+                 <span className="text-white">{selectedProduct.rating.toFixed(1)} Rating</span>
+               </div>
+             </div>
+           </div>
+           
+           {/* Short Description */}
+           <p className="text-gray-300 text-lg leading-relaxed line-clamp-3">{selectedProduct.description}</p>
+           
+           {/* Action Buttons */}
+           <div className="pt-4 flex gap-4">
+             <Button onClick={() => addToCart(selectedProduct)} className="flex-1 py-4 text-lg">
+               Add to Cart
+             </Button>
+             <Button 
+               onClick={() => toggleWishlist(selectedProduct)} 
+               variant="secondary" 
+               className={`px-4 border-2 ${isWishlisted ? 'border-red-500 text-red-500 bg-red-500/10' : ''}`}
+             >
+               <Icons.Heart size={24} fill={isWishlisted ? "currentColor" : "none"} />
+             </Button>
+           </div>
+           
+           {/* Key Benefits / Quick Specs Preview */}
+           <div className="grid grid-cols-3 gap-4 pt-4">
+              <div className="text-center p-3 bg-surface/50 rounded-lg border border-white/5">
+                <Icons.Truck className="mx-auto mb-2 text-neon-cyan" size={20} />
+                <p className="text-xs text-gray-400">Fast Shipping</p>
               </div>
-            </div>
-          </div>
+              <div className="text-center p-3 bg-surface/50 rounded-lg border border-white/5">
+                <Icons.ShieldCheck className="mx-auto mb-2 text-neon-green" size={20} />
+                <p className="text-xs text-gray-400">2 Year Warranty</p>
+              </div>
+              <div className="text-center p-3 bg-surface/50 rounded-lg border border-white/5">
+                <Icons.RotateCcw className="mx-auto mb-2 text-neon-purple" size={20} />
+                <p className="text-xs text-gray-400">30 Day Returns</p>
+              </div>
+           </div>
+        </div>
+      </div>
 
-          <p className="text-gray-300 text-lg leading-relaxed">{selectedProduct.description}</p>
+      {/* Tabs Section */}
+      <div className="bg-surface border border-white/10 rounded-2xl overflow-hidden animate-in slide-in-from-bottom-10 duration-700 delay-100">
+        <div className="flex border-b border-white/10 overflow-x-auto">
+          {['Description', 'Specifications', 'Reviews'].map((tab) => {
+             const key = tab.toLowerCase().slice(0, 4) === 'desc' ? 'desc' : tab.toLowerCase().slice(0, 5) === 'spec' ? 'specs' : 'reviews';
+             const isActive = activeTab === key;
+             return (
+               <button
+                 key={key}
+                 onClick={() => setActiveTab(key as any)}
+                 className={`px-8 py-5 text-sm font-bold uppercase tracking-wider transition-all relative ${
+                   isActive ? 'text-neon-cyan bg-white/5' : 'text-gray-500 hover:text-white hover:bg-white/5'
+                 }`}
+               >
+                 {tab}
+                 {isActive && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-neon-cyan shadow-[0_0_10px_rgba(0,255,255,0.8)]"></div>}
+               </button>
+             )
+          })}
+        </div>
+        
+        <div className="p-8 min-h-[300px]">
+           {activeTab === 'desc' && (
+             <div className="max-w-3xl space-y-4 animate-in fade-in slide-in-from-left-2">
+               <h3 className="text-2xl font-bold font-display text-white">Product Overview</h3>
+               <p className="text-gray-300 leading-relaxed text-lg">{selectedProduct.description}</p>
+               <p className="text-gray-400 leading-relaxed">
+                 Engineered for elite performance, the {selectedProduct.name} represents the pinnacle of {selectedProduct.category} technology. 
+                 Whether you are grinding rank in competitive shooters or immersing yourself in open-world RPGs, this gear delivers the reliability and precision required by professional esports athletes.
+               </p>
+             </div>
+           )}
+           
+           {activeTab === 'specs' && (
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in slide-in-from-left-2">
+                <div>
+                   <h3 className="text-2xl font-bold font-display text-white mb-6">Technical Specifications</h3>
+                   <ul className="space-y-4">
+                     {selectedProduct.specs.map((spec, i) => (
+                       <li key={i} className="flex items-center gap-4 p-4 bg-black/30 rounded-lg border border-white/5 hover:border-neon-purple/50 transition-colors">
+                         <div className="w-2 h-2 bg-neon-purple rounded-full shadow-[0_0_5px_rgba(176,38,255,0.8)]"></div>
+                         <span className="text-gray-200">{spec}</span>
+                       </li>
+                     ))}
+                   </ul>
+                </div>
+                <div className="bg-black/30 rounded-xl p-6 border border-white/5 flex flex-col justify-center items-center text-center">
+                   <Icons.Cpu size={48} className="text-neon-cyan mb-4 opacity-50" />
+                   <p className="text-gray-500">Full datasheet available for download.</p>
+                   <Button variant="secondary" className="mt-4">Download PDF</Button>
+                </div>
+             </div>
+           )}
 
-          <div className="bg-surface/50 rounded-xl p-6 border border-white/5">
-            <h3 className="font-bold text-white mb-4 flex items-center gap-2">
-              <Icons.Cpu size={18} className="text-neon-green" /> Tech Specs
-            </h3>
-            <ul className="grid grid-cols-2 gap-3">
-              {selectedProduct.specs.map((spec, i) => (
-                <li key={i} className="text-gray-400 text-sm flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 bg-neon-purple rounded-full"></div>
-                  {spec}
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="pt-6">
-            <Button onClick={() => addToCart(selectedProduct)} className="w-full py-4 text-lg">
-              Add to Cart
-            </Button>
-          </div>
+           {activeTab === 'reviews' && (
+             <div className="animate-in fade-in slide-in-from-left-2">
+               <div className="flex items-center justify-between mb-8">
+                 <h3 className="text-2xl font-bold font-display text-white">Verified Player Feedback</h3>
+                 <Button variant="secondary">Write a Review</Button>
+               </div>
+               
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                 {reviews.map((review, i) => (
+                   <div key={i} className="bg-black/30 p-6 rounded-xl border border-white/5">
+                     <div className="flex justify-between items-start mb-4">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-neon-purple to-neon-cyan flex items-center justify-center text-xs font-bold text-black">
+                            {review.user.charAt(0)}
+                          </div>
+                          <span className="font-bold text-white">{review.user}</span>
+                        </div>
+                        <span className="text-xs text-gray-500">{review.date}</span>
+                     </div>
+                     <div className="flex text-yellow-400 mb-3">
+                       {[...Array(5)].map((_, starI) => (
+                         <Icons.Star key={starI} size={14} className={starI < review.rating ? "fill-current" : "text-gray-700"} />
+                       ))}
+                     </div>
+                     <p className="text-gray-300">"{review.text}"</p>
+                   </div>
+                 ))}
+               </div>
+             </div>
+           )}
         </div>
       </div>
     </div>
@@ -639,8 +828,9 @@ const CheckoutForm = () => {
       
       if (result.success) {
         // Success
+        const orderId = result.transactionId || Math.random().toString(36).substr(2, 9);
         const order: Order = {
-          id: result.transactionId || Math.random().toString(36).substr(2, 9),
+          id: orderId,
           userId: user ? user.id : 'guest',
           items: [...cart],
           total: total,
@@ -649,7 +839,7 @@ const CheckoutForm = () => {
         };
         db.createOrder(order);
         clearCart();
-        alert('Payment Authorized! Order confirmed.');
+        alert(`Payment Authorized! Order confirmed. Your Order ID is: ${orderId}`);
         setView('home');
       } else {
         setError(result.error || 'Server rejected payment');
@@ -728,6 +918,134 @@ const CheckoutView = () => {
       <Elements stripe={stripePromise}>
         <CheckoutForm />
       </Elements>
+    </div>
+  );
+};
+
+const OrderTrackingView = () => {
+  const [orderId, setOrderId] = useState('');
+  const [order, setOrder] = useState<Order | null>(null);
+  const [searched, setSearched] = useState(false);
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    const allOrders = db.getOrders();
+    const cleanId = orderId.trim().replace(/^#/, '');
+    const found = allOrders.find(o => o.id === cleanId);
+    setOrder(found || null);
+    setSearched(true);
+  };
+
+  const steps = [
+    { id: 'pending', label: 'Processing', icon: Icons.Clock },
+    { id: 'shipped', label: 'In Transit', icon: Icons.Truck },
+    { id: 'delivered', label: 'Delivered', icon: Icons.CheckCircle },
+  ];
+
+  const getCurrentStepIndex = (status: string) => {
+    return steps.findIndex(s => s.id === status);
+  };
+
+  return (
+    <div className="max-w-4xl mx-auto px-6 py-10 min-h-screen">
+      <div className="text-center mb-12">
+        <h2 className="text-4xl font-display font-bold mb-4">TRACK <span className="text-neon-cyan">ORDER</span></h2>
+        <p className="text-gray-400">Enter your order ID to get real-time status updates from the Vortex logistics network.</p>
+      </div>
+
+      <div className="max-w-lg mx-auto mb-16">
+        <form onSubmit={handleSearch} className="flex gap-2">
+          <div className="relative flex-1">
+            <Icons.Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500" size={20} />
+            <input 
+              type="text" 
+              value={orderId}
+              onChange={(e) => setOrderId(e.target.value)}
+              placeholder="e.g. tx_3j92k..." 
+              className="w-full bg-surface border border-gray-700 rounded-lg pl-10 pr-4 py-3 text-white focus:border-neon-cyan outline-none transition-colors"
+            />
+          </div>
+          <Button type="submit">Track</Button>
+        </form>
+      </div>
+
+      {searched && !order && (
+        <div className="text-center p-8 bg-surface/50 rounded-xl border border-red-500/20">
+          <Icons.Package className="w-16 h-16 text-gray-700 mx-auto mb-4" />
+          <h3 className="text-xl font-bold text-white mb-2">Order Not Found</h3>
+          <p className="text-gray-500">Could not locate shipment data for ID: <span className="text-red-400 font-mono">{orderId}</span></p>
+        </div>
+      )}
+
+      {order && (
+        <div className="animate-in slide-in-from-bottom-5 duration-500">
+          <div className="bg-surface border border-white/10 rounded-2xl p-8 mb-8">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8 border-b border-white/5 pb-6">
+              <div>
+                <p className="text-gray-500 text-sm font-mono">ORDER ID</p>
+                <h3 className="text-2xl font-bold text-neon-cyan font-mono">#{order.id}</h3>
+              </div>
+              <div className="text-right">
+                <p className="text-gray-500 text-sm">ESTIMATED DELIVERY</p>
+                <p className="text-white font-bold">{new Date(new Date(order.date).getTime() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString()}</p>
+              </div>
+            </div>
+
+            {/* Progress Bar */}
+            <div className="relative mb-12 px-4">
+              <div className="absolute top-1/2 left-0 w-full h-1 bg-gray-800 -translate-y-1/2 rounded-full"></div>
+              <div 
+                className="absolute top-1/2 left-0 h-1 bg-neon-green -translate-y-1/2 rounded-full transition-all duration-1000"
+                style={{ width: `${((getCurrentStepIndex(order.status) / (steps.length - 1)) * 100)}%` }}
+              ></div>
+              
+              <div className="relative flex justify-between">
+                {steps.map((step, idx) => {
+                  const currentIdx = getCurrentStepIndex(order.status);
+                  const isActive = idx <= currentIdx;
+                  const isCurrent = idx === currentIdx;
+                  
+                  return (
+                    <div key={step.id} className="flex flex-col items-center gap-2">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center border-4 transition-all duration-500 z-10 ${
+                        isActive 
+                          ? 'bg-black border-neon-green text-neon-green shadow-[0_0_15px_rgba(57,255,20,0.4)]' 
+                          : 'bg-gray-900 border-gray-700 text-gray-600'
+                      }`}>
+                        <step.icon size={18} />
+                      </div>
+                      <span className={`text-sm font-bold ${isActive ? 'text-white' : 'text-gray-600'}`}>{step.label}</span>
+                      {isCurrent && <span className="text-xs text-neon-green animate-pulse">Current Status</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="bg-black/30 rounded-xl p-6">
+              <h4 className="font-bold text-white mb-4 flex items-center gap-2">
+                <Icons.Package size={18} className="text-neon-purple" /> Shipment Contents
+              </h4>
+              <div className="space-y-4">
+                {order.items.map((item, idx) => (
+                  <div key={idx} className="flex items-center gap-4">
+                    <img src={item.image} alt={item.name} className="w-12 h-12 rounded bg-gray-800 object-cover" />
+                    <div className="flex-1">
+                      <p className="text-white text-sm font-bold line-clamp-1">{item.name}</p>
+                      <p className="text-gray-500 text-xs">Qty: {item.quantity}</p>
+                    </div>
+                    <span className="text-white font-mono">${item.price}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 pt-4 border-t border-white/5 flex justify-between items-center">
+                <span className="text-gray-400 text-sm">Total Paid</span>
+                <span className="text-xl font-bold text-neon-cyan">${order.total.toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -954,10 +1272,70 @@ const AdminView = () => {
   );
 };
 
+// --- Legal Views ---
+
+const TermsView = () => {
+  return (
+    <div className="max-w-4xl mx-auto px-6 py-12 min-h-screen">
+      <h2 className="text-4xl font-display font-bold mb-8 text-neon-cyan">TERMS OF SERVICE</h2>
+      <div className="space-y-8 text-gray-300 leading-relaxed">
+        <div className="bg-surface border border-white/10 p-8 rounded-xl">
+          <h3 className="text-xl font-bold text-white mb-4">1. ACCEPTANCE OF TERMS</h3>
+          <p>By accessing or using the Vortex Gaming platform ("The System"), you agree to be bound by these Terms of Service. If you do not agree to all terms and conditions, you are not authorized to access the armory or make requisitions.</p>
+        </div>
+        
+        <div className="bg-surface border border-white/10 p-8 rounded-xl">
+          <h3 className="text-xl font-bold text-white mb-4">2. ACCOUNTS & SECURITY</h3>
+          <p>You are responsible for maintaining the confidentiality of your Vortex ID and password. Any activity occurring under your account is your responsibility. Report any unauthorized breach of your perimeter immediately to command.</p>
+        </div>
+
+        <div className="bg-surface border border-white/10 p-8 rounded-xl">
+          <h3 className="text-xl font-bold text-white mb-4">3. PRODUCT AVAILABILITY</h3>
+          <p>All hardware listed in the armory is subject to availability. We reserve the right to limit quantities or discontinue items without notice. Prices are subject to change based on global supply chain fluctuations.</p>
+        </div>
+
+        <div className="bg-surface border border-white/10 p-8 rounded-xl">
+          <h3 className="text-xl font-bold text-white mb-4">4. RETURNS & REFUNDS</h3>
+          <p>You have 30 days from the date of delivery to initiate a return request ("Extraction Protocol"). Items must be in original condition. Opened software or consumables cannot be refunded.</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const PrivacyView = () => {
+  return (
+    <div className="max-w-4xl mx-auto px-6 py-12 min-h-screen">
+      <h2 className="text-4xl font-display font-bold mb-8 text-neon-purple">PRIVACY PROTOCOLS</h2>
+      <div className="space-y-8 text-gray-300 leading-relaxed">
+        <div className="bg-surface border border-white/10 p-8 rounded-xl">
+          <h3 className="text-xl font-bold text-white mb-4">1. DATA EXTRACTION</h3>
+          <p>We collect personal information that you voluntarily provide when you register a Vortex ID or execute a purchase. This includes your designation (name), communication channel (email), and physical coordinates (shipping address).</p>
+        </div>
+        
+        <div className="bg-surface border border-white/10 p-8 rounded-xl">
+          <h3 className="text-xl font-bold text-white mb-4">2. AI PROCESSING</h3>
+          <p>Vortex AI processes your search queries and product interactions to optimize your loadout recommendations. This data is anonymized and used solely to improve system efficiency.</p>
+        </div>
+
+        <div className="bg-surface border border-white/10 p-8 rounded-xl">
+          <h3 className="text-xl font-bold text-white mb-4">3. PAYMENT SECURITY</h3>
+          <p>Financial transactions are handled by Stripe, a secure third-party processor. Vortex does not store complete credit card numbers on our local servers. All transmissions are encrypted via SSL/TLS protocols.</p>
+        </div>
+
+        <div className="bg-surface border border-white/10 p-8 rounded-xl">
+          <h3 className="text-xl font-bold text-white mb-4">4. COOKIES & LOCAL STORAGE</h3>
+          <p>We use local storage mechanisms to persist your shopping cart and wishlist status across sessions. By using the platform, you consent to these essential data storage operations.</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // --- Main App Logic ---
 
 const AppContent = () => {
-  const { currentView } = useAppContext();
+  const { currentView, setView } = useAppContext();
 
   const renderView = () => {
     switch (currentView) {
@@ -970,6 +1348,10 @@ const AppContent = () => {
       case 'login': return <LoginView />;
       case 'admin': return <AdminView />;
       case 'profile': return <ProfileView />;
+      case 'order-tracking': return <OrderTrackingView />;
+      case 'wishlist': return <WishlistView />;
+      case 'terms': return <TermsView />;
+      case 'privacy': return <PrivacyView />;
       default: return <HomeView />;
     }
   };
@@ -987,8 +1369,11 @@ const AppContent = () => {
             <Icons.Zap className="text-gray-600" />
             <span className="font-display font-bold text-gray-500">VORTEX GAMING</span>
           </div>
-          <div className="text-gray-600 text-sm">
-            © 2024 Vortex Systems. All rights reserved.
+          <div className="flex items-center gap-6 text-gray-600 text-sm">
+            <button onClick={() => setView('order-tracking')} className="hover:text-neon-cyan transition-colors">Track Order</button>
+            <button onClick={() => setView('terms')} className="hover:text-white transition-colors">Terms</button>
+            <button onClick={() => setView('privacy')} className="hover:text-white transition-colors">Privacy</button>
+            <span>© 2024 Vortex Systems.</span>
           </div>
         </div>
       </footer>
@@ -1005,12 +1390,17 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentView, setView] = useState<ViewState>('home');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [shopFilter, setShopFilter] = useState<string>('all');
+  const [wishlist, setWishlist] = useState<Product[]>([]);
 
   useEffect(() => {
     // Init Mock Data
     setProducts(db.getProducts());
     const existingUser = db.getUser();
     if (existingUser) setUser(existingUser);
+    
+    // Init Wishlist
+    const storedWishlist = localStorage.getItem('vortex_wishlist');
+    if (storedWishlist) setWishlist(JSON.parse(storedWishlist));
   }, []);
 
   const login = (email: string) => {
@@ -1042,6 +1432,24 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   const clearCart = () => setCart([]);
 
+  const toggleWishlist = (product: Product) => {
+    setWishlist(prev => {
+      const exists = prev.find(p => p.id === product.id);
+      let newList;
+      if (exists) {
+        newList = prev.filter(p => p.id !== product.id);
+      } else {
+        newList = [...prev, product];
+      }
+      localStorage.setItem('vortex_wishlist', JSON.stringify(newList));
+      return newList;
+    });
+  };
+
+  const isInWishlist = (productId: string) => {
+    return wishlist.some(p => p.id === productId);
+  };
+
   return (
     <AppContext.Provider value={{
       user, login, logout,
@@ -1049,7 +1457,8 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       products,
       currentView, setView,
       selectedProduct, setSelectedProduct,
-      shopFilter, setShopFilter
+      shopFilter, setShopFilter,
+      wishlist, toggleWishlist, isInWishlist
     }}>
       {children}
     </AppContext.Provider>
