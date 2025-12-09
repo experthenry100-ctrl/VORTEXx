@@ -171,10 +171,23 @@ const generateProducts = (): Product[] => {
   return products;
 };
 
+// Data Version Key
+const DATA_KEY = 'vortex_cj_products_v5';
+
 export const getProducts = (): Product[] => {
-  // Updated version key to force refresh of images
+  // Check for existing data to ensure persistence across reloads
+  const stored = localStorage.getItem(DATA_KEY);
+  if (stored) {
+    try {
+      return JSON.parse(stored);
+    } catch (e) {
+      console.error("Failed to parse stored products, regenerating.");
+    }
+  }
+
+  // Generate new if missing
   const products = generateProducts();
-  localStorage.setItem('vortex_cj_products_v4', JSON.stringify(products));
+  localStorage.setItem(DATA_KEY, JSON.stringify(products));
   return products;
 };
 

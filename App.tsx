@@ -632,12 +632,18 @@ const ProductDetailView = () => {
       <div className="bg-surface border border-white/10 rounded-2xl overflow-hidden animate-in slide-in-from-bottom-10 duration-700 delay-100">
         <div className="flex border-b border-white/10 overflow-x-auto">
           {['Description', 'Specifications', 'Reviews'].map((tab) => {
-             const key = tab.toLowerCase().slice(0, 4) === 'desc' ? 'desc' : tab.toLowerCase().slice(0, 5) === 'spec' ? 'specs' : 'reviews';
+             // Fixed tab logic: ensure 'specifications' maps to 'specs' correctly
+             let key: 'desc' | 'specs' | 'reviews';
+             const lower = tab.toLowerCase();
+             if (lower.includes('desc')) key = 'desc';
+             else if (lower.includes('spec')) key = 'specs';
+             else key = 'reviews';
+
              const isActive = activeTab === key;
              return (
                <button
                  key={key}
-                 onClick={() => setActiveTab(key as any)}
+                 onClick={() => setActiveTab(key)}
                  className={`px-8 py-5 text-sm font-bold uppercase tracking-wider transition-all relative ${
                    isActive ? 'text-neon-cyan bg-white/5' : 'text-gray-500 hover:text-white hover:bg-white/5'
                  }`}
@@ -1104,9 +1110,9 @@ const ProfileView = () => {
   useEffect(() => {
     if (user) {
       const allOrders = db.getOrders();
-      // Filter orders by user ID
-      const myOrders = allOrders.filter(o => o.userId === user.id);
-      setOrders(myOrders.reverse()); // Newest first
+      // Filter orders by user ID and ensure newest first using a copy
+      const myOrders = allOrders.filter(o => o.userId === user.id).reverse();
+      setOrders(myOrders);
     }
   }, [user]);
 
@@ -1405,6 +1411,10 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     // Init Wishlist
     const storedWishlist = localStorage.getItem('vortex_wishlist');
     if (storedWishlist) setWishlist(JSON.parse(storedWishlist));
+
+    // Init Cart
+    const storedCart = localStorage.getItem('vortex_cart');
+    if (storedCart) setCart(JSON.parse(storedCart));
   }, []);
 
   const login = (email: string) => {
@@ -1421,20 +1431,31 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const addToCart = (product: Product) => {
     setCart(prev => {
       const existing = prev.find(item => item.id === product.id);
+      let newCart;
       if (existing) {
-        return prev.map(item => 
+        newCart = prev.map(item => 
           item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
         );
+      } else {
+        newCart = [...prev, { ...product, quantity: 1 }];
       }
-      return [...prev, { ...product, quantity: 1 }];
+      localStorage.setItem('vortex_cart', JSON.stringify(newCart));
+      return newCart;
     });
   };
 
   const removeFromCart = (id: string) => {
-    setCart(prev => prev.filter(item => item.id !== id));
+    setCart(prev => {
+      const newCart = prev.filter(item => item.id !== id);
+      localStorage.setItem('vortex_cart', JSON.stringify(newCart));
+      return newCart;
+    });
   };
 
-  const clearCart = () => setCart([]);
+  const clearCart = () => {
+    setCart([]);
+    localStorage.removeItem('vortex_cart');
+  };
 
   const toggleWishlist = (product: Product) => {
     setWishlist(prev => {
