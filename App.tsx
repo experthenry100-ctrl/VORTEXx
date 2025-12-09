@@ -738,6 +738,10 @@ const CartView = () => {
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-10 min-h-screen">
+      <Button variant="ghost" onClick={() => setView('shop')} className="mb-6 pl-0">
+        <Icons.Back size={18} /> Continue Shopping
+      </Button>
+
       <h2 className="text-3xl font-display font-bold mb-8 flex items-center gap-3">
         <Icons.Cart /> Inventory
       </h2>
